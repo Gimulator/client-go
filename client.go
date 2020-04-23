@@ -216,7 +216,7 @@ func (c *Client) Register(username, password, role string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusAccepted {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
