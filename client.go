@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -228,13 +229,16 @@ func (c *Client) Register(username, password, role string) error {
 
 func (c *Client) Socket(ch chan Object) error {
 	url := c.url("SOCKET")
-	ws, _, err := c.Dial(url, nil)
-	if err != nil {
-		return err
-	}
-
-	go c.reconcile(ch, ws)
-
+	go func() {
+		for {
+			ws, _, err := c.Dial(url, nil)
+			if err != nil {
+				time.Sleep(time.Millisecond * 500)
+				continue
+			}
+			c.reconcile(ch, ws)
+		}
+	}()
 	return nil
 }
 
@@ -243,7 +247,7 @@ func (c *Client) reconcile(ch chan Object, ws *websocket.Conn) {
 	for {
 		err := ws.ReadJSON(&obj)
 		if websocket.IsCloseError(err) {
-			c.Socket(ch)
+			return
 		} else if err != nil {
 			continue
 		}
