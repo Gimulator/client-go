@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -193,12 +194,26 @@ func (c *Client) Watch(key Key) error {
 	return nil
 }
 
-func (c *Client) Register(username, password, role string) error {
+func (c *Client) Register() error {
+	username := os.Getenv("USERNAME")
+	if username == "" {
+		return fmt.Errorf("'USERNAME' environment variable is not set")
+	}
+
+	password := os.Getenv("PASSWORD")
+	if password == "" {
+		return fmt.Errorf("'PASSWORD' environment variable is not set")
+	}
+
+	return c.register(username, password)
+}
+
+func (c *Client) register(username, password string) error {
 	url := c.url("REGISTER")
 
 	cred := struct {
-		Username, Password, Role string
-	}{username, password, role}
+		Username, Password string
+	}{username, password}
 
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(cred)
