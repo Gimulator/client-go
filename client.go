@@ -195,14 +195,14 @@ func (c *Client) Watch(key Key) error {
 }
 
 func (c *Client) Register() error {
-	username := os.Getenv("USERNAME")
+	username := os.Getenv("CLIENT_USERNAME")
 	if username == "" {
-		return fmt.Errorf("'USERNAME' environment variable is not set")
+		return fmt.Errorf("'CLIENT_USERNAME' environment variable is not set")
 	}
 
-	password := os.Getenv("PASSWORD")
+	password := os.Getenv("CLIENT_PASSWORD")
 	if password == "" {
-		return fmt.Errorf("'PASSWORD' environment variable is not set")
+		return fmt.Errorf("'CLIENT_PASSWORD' environment variable is not set")
 	}
 
 	return c.register(username, password)
