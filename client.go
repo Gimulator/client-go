@@ -21,9 +21,24 @@ type Client struct {
 	addr string
 }
 
-func NewClient(addr string) *Client {
+func NewClient(ch chan Object) (*Client, error) {
+	addr := os.Getenv("GIMULATOR_HOST")
+	if addr == "" {
+		return nil, fmt.Errorf("'GIMULATOR_HOST' environment variable is not set")
+	}
+
+	username := os.Getenv("CLIENT_USERNAME")
+	if username == "" {
+		return nil, fmt.Errorf("'CLIENT_USERNAME' environment variable is not set")
+	}
+
+	password := os.Getenv("CLIENT_PASSWORD")
+	if password == "" {
+		return nil, fmt.Errorf("'CLIENT_PASSWORD' environment variable is not set")
+	}
+
 	jar := newJar()
-	return &Client{
+	cli := &Client{
 		Client: http.Client{
 			Jar: jar,
 		},
@@ -32,6 +47,16 @@ func NewClient(addr string) *Client {
 		},
 		addr: addr,
 	}
+
+	if err := cli.register(username, password); err != nil {
+		return nil, err
+	}
+
+	if err := cli.socket(ch); err != nil {
+		return nil, err
+	}
+
+	return cli, nil
 }
 
 func (c *Client) Get(key Key) (Object, error) {
@@ -194,20 +219,6 @@ func (c *Client) Watch(key Key) error {
 	return nil
 }
 
-func (c *Client) Register() error {
-	username := os.Getenv("CLIENT_USERNAME")
-	if username == "" {
-		return fmt.Errorf("'CLIENT_USERNAME' environment variable is not set")
-	}
-
-	password := os.Getenv("CLIENT_PASSWORD")
-	if password == "" {
-		return fmt.Errorf("'CLIENT_PASSWORD' environment variable is not set")
-	}
-
-	return c.register(username, password)
-}
-
 func (c *Client) register(username, password string) error {
 	url := c.url("REGISTER")
 
@@ -242,7 +253,7 @@ func (c *Client) register(username, password string) error {
 	return nil
 }
 
-func (c *Client) Socket(ch chan Object) error {
+func (c *Client) socket(ch chan Object) error {
 	url := c.url("SOCKET")
 	go func() {
 		for {
