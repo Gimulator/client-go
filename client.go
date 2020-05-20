@@ -342,7 +342,7 @@ func (c *Client) body(i interface{}) (*bytes.Buffer, error) {
 	default:
 		return nil, fmt.Errorf("invalid type. type must be 'object' or 'key'")
 	}
-	obj.Setter = c.id
+	obj.Owner = c.id
 
 	buffer := &bytes.Buffer{}
 	err := json.NewEncoder(buffer).Encode(obj)
@@ -410,7 +410,7 @@ func (k Key) Match(key Key) bool {
 }
 
 type Object struct {
-	Setter string
+	Owner string
 	Key    Key
 	Value  interface{}
 }
