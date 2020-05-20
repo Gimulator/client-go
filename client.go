@@ -21,20 +21,15 @@ type Client struct {
 	addr string
 }
 
-func NewClient(ch chan Object) (*Client, error) {
+func NewClient(ch chan Object, name string) (*Client, error) {
 	addr := os.Getenv("GIMULATOR_HOST")
 	if addr == "" {
 		return nil, fmt.Errorf("'GIMULATOR_HOST' environment variable is not set")
 	}
 
-	username := os.Getenv("CLIENT_USERNAME")
-	if username == "" {
-		return nil, fmt.Errorf("'CLIENT_USERNAME' environment variable is not set")
-	}
-
-	password := os.Getenv("CLIENT_PASSWORD")
-	if password == "" {
-		return nil, fmt.Errorf("'CLIENT_PASSWORD' environment variable is not set")
+	id := os.Getenv("CLIENT_ID")
+	if id == "" {
+		return nil, fmt.Errorf("'CLIENT_ID' environment variable is not set")
 	}
 
 	jar := newJar()
@@ -48,7 +43,7 @@ func NewClient(ch chan Object) (*Client, error) {
 		addr: addr,
 	}
 
-	if err := cli.register(username, password); err != nil {
+	if err := cli.register(name, id); err != nil {
 		return nil, err
 	}
 
@@ -219,12 +214,12 @@ func (c *Client) Watch(key Key) error {
 	return nil
 }
 
-func (c *Client) register(username, password string) error {
+func (c *Client) register(name, id string) error {
 	url := c.url("REGISTER")
 
 	cred := struct {
-		Username, Password string
-	}{username, password}
+		Name, ID string
+	}{name, id}
 
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(cred)
