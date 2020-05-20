@@ -16,12 +16,13 @@ import (
 )
 
 type Client struct {
+	id string
 	http.Client
 	websocket.Dialer
 	addr string
 }
 
-func NewClient(ch chan Object, name string) (*Client, error) {
+func NewClient(ch chan Object) (*Client, error) {
 	addr := os.Getenv("GIMULATOR_HOST")
 	if addr == "" {
 		return nil, fmt.Errorf("'GIMULATOR_HOST' environment variable is not set")
@@ -41,9 +42,10 @@ func NewClient(ch chan Object, name string) (*Client, error) {
 			Jar: jar,
 		},
 		addr: addr,
+		id:   id,
 	}
 
-	if err := cli.register(name, id); err != nil {
+	if err := cli.register(id); err != nil {
 		return nil, err
 	}
 
@@ -214,12 +216,12 @@ func (c *Client) Watch(key Key) error {
 	return nil
 }
 
-func (c *Client) register(name, id string) error {
+func (c *Client) register(id string) error {
 	url := c.url("REGISTER")
 
 	cred := struct {
-		Name, ID string
-	}{name, id}
+		ID string
+	}{id}
 
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(cred)
@@ -340,6 +342,7 @@ func (c *Client) body(i interface{}) (*bytes.Buffer, error) {
 	default:
 		return nil, fmt.Errorf("invalid type. type must be 'object' or 'key'")
 	}
+	obj.Setter = c.id
 
 	buffer := &bytes.Buffer{}
 	err := json.NewEncoder(buffer).Encode(obj)
@@ -407,6 +410,7 @@ func (k Key) Match(key Key) bool {
 }
 
 type Object struct {
-	Key   Key
-	Value interface{}
+	Setter string
+	Key    Key
+	Value  interface{}
 }
