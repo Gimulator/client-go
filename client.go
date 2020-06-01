@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +19,7 @@ type Client struct {
 	http.Client
 	websocket.Dialer
 	addr string
+	ch   chan Object
 }
 
 func NewClient(ch chan Object) (*Client, error) {
@@ -43,13 +43,14 @@ func NewClient(ch chan Object) (*Client, error) {
 		},
 		addr: addr,
 		id:   id,
+		ch:   ch,
 	}
 
-	if err := cli.register(id); err != nil {
+	if err := cli.register(); err != nil {
 		return nil, err
 	}
 
-	if err := cli.socket(ch); err != nil {
+	if err := cli.socket(); err != nil {
 		return nil, err
 	}
 
@@ -57,14 +58,14 @@ func NewClient(ch chan Object) (*Client, error) {
 }
 
 func (c *Client) Get(key Key) (Object, error) {
-	url := c.url("GET")
+	url := c.url(urlPathGet)
 
 	buf, err := c.body(key)
 	if err != nil {
 		return Object{}, err
 	}
 
-	req, err := http.NewRequest("POST", url, buf)
+	req, err := http.NewRequest(http.MethodPost, url, buf)
 	if err != nil {
 		return Object{}, err
 	}
@@ -75,7 +76,7 @@ func (c *Client) Get(key Key) (Object, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return Object{}, err
@@ -92,14 +93,14 @@ func (c *Client) Get(key Key) (Object, error) {
 }
 
 func (c *Client) Find(key Key) ([]Object, error) {
-	url := c.url("FIND")
+	url := c.url(urlPathFind)
 
 	buf, err := c.body(key)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", url, buf)
+	req, err := http.NewRequest(http.MethodPost, url, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +111,7 @@ func (c *Client) Find(key Key) ([]Object, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
@@ -126,15 +127,16 @@ func (c *Client) Find(key Key) ([]Object, error) {
 	return objectList, nil
 }
 
-func (c *Client) Set(obj Object) error {
-	url := c.url("SET")
+func (c *Client) Set(key Key, val interface{}) error {
+	obj := Object{Key: key, Value: val}
+	url := c.url(urlPathSet)
 
 	buf, err := c.body(obj)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, buf)
+	req, err := http.NewRequest(http.MethodPost, url, buf)
 	if err != nil {
 		return err
 	}
@@ -145,7 +147,7 @@ func (c *Client) Set(obj Object) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -157,14 +159,14 @@ func (c *Client) Set(obj Object) error {
 }
 
 func (c *Client) Delete(key Key) error {
-	url := c.url("DELETE")
+	url := c.url(urlPathDelete)
 
 	buf, err := c.body(key)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, buf)
+	req, err := http.NewRequest(http.MethodPost, url, buf)
 	if err != nil {
 		return err
 	}
@@ -175,7 +177,7 @@ func (c *Client) Delete(key Key) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -187,14 +189,14 @@ func (c *Client) Delete(key Key) error {
 }
 
 func (c *Client) Watch(key Key) error {
-	url := c.url("WATCH")
+	url := c.url(urlPathWatch)
 
 	buf, err := c.body(key)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, buf)
+	req, err := http.NewRequest(http.MethodPost, url, buf)
 	if err != nil {
 		return err
 	}
@@ -205,7 +207,7 @@ func (c *Client) Watch(key Key) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -216,12 +218,12 @@ func (c *Client) Watch(key Key) error {
 	return nil
 }
 
-func (c *Client) register(id string) error {
-	url := c.url("REGISTER")
+func (c *Client) register() error {
+	url := c.url(urlPathRegister)
 
 	cred := struct {
 		ID string
-	}{id}
+	}{c.id}
 
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(cred)
@@ -229,7 +231,7 @@ func (c *Client) register(id string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, buf)
+	req, err := http.NewRequest(http.MethodPost, url, buf)
 	if err != nil {
 		return err
 	}
@@ -240,7 +242,7 @@ func (c *Client) register(id string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -250,8 +252,8 @@ func (c *Client) register(id string) error {
 	return nil
 }
 
-func (c *Client) socket(ch chan Object) error {
-	url := c.url("SOCKET")
+func (c *Client) socket() error {
+	url := c.url(urlPathSocket)
 	go func() {
 		for {
 			ws, _, err := c.Dial(url, nil)
@@ -259,13 +261,13 @@ func (c *Client) socket(ch chan Object) error {
 				time.Sleep(time.Millisecond * 500)
 				continue
 			}
-			c.reconcile(ch, ws)
+			c.reconcile(ws)
 		}
 	}()
 	return nil
 }
 
-func (c *Client) reconcile(ch chan Object, ws *websocket.Conn) {
+func (c *Client) reconcile(ws *websocket.Conn) {
 	var obj Object
 	for {
 		err := ws.ReadJSON(&obj)
@@ -274,58 +276,33 @@ func (c *Client) reconcile(ch chan Object, ws *websocket.Conn) {
 		} else if err != nil {
 			continue
 		}
-		ch <- obj
+		c.ch <- obj
 	}
 }
 
-func (c *Client) url(action string) string {
-	var u url.URL
-	switch strings.ToUpper(action) {
-	case "GET":
-		u = url.URL{
-			Scheme: "http",
-			Host:   c.addr,
-			Path:   "get",
-		}
-	case "SET":
-		u = url.URL{
-			Scheme: "http",
-			Host:   c.addr,
-			Path:   "set",
-		}
-	case "DELETE":
-		u = url.URL{
-			Scheme: "http",
-			Host:   c.addr,
-			Path:   "delete",
-		}
-	case "FIND":
-		u = url.URL{
-			Scheme: "http",
-			Host:   c.addr,
-			Path:   "/find",
-		}
-	case "WATCH":
-		u = url.URL{
-			Scheme: "http",
-			Host:   c.addr,
-			Path:   "/watch",
-		}
-	case "REGISTER":
-		u = url.URL{
-			Scheme: "http",
-			Host:   c.addr,
-			Path:   "/register",
-		}
-	case "SOCKET":
-		u = url.URL{
-			Scheme: "ws",
-			Host:   c.addr,
-			Path:   "/socket",
-		}
-	default:
-		panic("unknown action")
+type urlPath string
+
+const (
+	urlPathGet      urlPath = "get"
+	urlPathSet      urlPath = "set"
+	urlPathFind     urlPath = "find"
+	urlPathDelete   urlPath = "delete"
+	urlPathWatch    urlPath = "watch"
+	urlPathRegister urlPath = "register"
+	urlPathSocket   urlPath = "socket"
+)
+
+func (c *Client) url(path urlPath) string {
+	u := url.URL{
+		Scheme: "http",
+		Host:   c.addr,
+		Path:   string(path),
 	}
+
+	if path == urlPathSocket {
+		u.Scheme = "ws"
+	}
+
 	return u.String()
 }
 
@@ -351,6 +328,9 @@ func (c *Client) body(i interface{}) (*bytes.Buffer, error) {
 	}
 	return buffer, nil
 }
+
+// **************************** Jar ****************************
+// It is here to handle cookies
 
 type Jar struct {
 	sync.Mutex
@@ -380,6 +360,9 @@ func (jar *Jar) Cookies(u *url.URL) []*http.Cookie {
 	defer jar.Unlock()
 	return jar.cookies[u.Host]
 }
+
+// **************************** Object ****************************
+// It is what Gimulator uses in communications
 
 type Key struct {
 	Type      string
@@ -411,6 +394,6 @@ func (k Key) Match(key Key) bool {
 
 type Object struct {
 	Owner string
-	Key    Key
-	Value  interface{}
+	Key   Key
+	Value interface{}
 }
