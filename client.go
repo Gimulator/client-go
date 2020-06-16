@@ -319,7 +319,6 @@ func (c *Client) body(i interface{}) (*bytes.Buffer, error) {
 	default:
 		return nil, fmt.Errorf("invalid type. type must be 'object' or 'key'")
 	}
-	obj.Owner = c.id
 
 	buffer := &bytes.Buffer{}
 	err := json.NewEncoder(buffer).Encode(obj)
@@ -364,6 +363,22 @@ func (jar *Jar) Cookies(u *url.URL) []*http.Cookie {
 // **************************** Object ****************************
 // It is what Gimulator uses in communications
 
+type Method string
+
+const (
+	MethodGet    Method = "get"
+	MethodSet    Method = "set"
+	MethodFind   Method = "find"
+	MethodDelete Method = "delete"
+	MethodWatch  Method = "watch"
+)
+
+type Meta struct {
+	CreationTime time.Time
+	Owner        string
+	Method       Method
+}
+
 type Key struct {
 	Type      string
 	Namespace string
@@ -393,7 +408,7 @@ func (k Key) Match(key Key) bool {
 }
 
 type Object struct {
-	Owner string
+	Meta  Meta
 	Key   Key
 	Value interface{}
 }
