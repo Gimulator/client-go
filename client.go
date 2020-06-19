@@ -127,7 +127,7 @@ func (c *Client) Find(key Key) ([]Object, error) {
 	return objectList, nil
 }
 
-func (c *Client) Set(key Key, val interface{}) error {
+func (c *Client) Set(key Key, val stringt ) error {
 	obj := Object{Key: key, Value: val}
 	url := c.url(urlPathSet)
 
@@ -410,5 +410,5 @@ func (k Key) Match(key Key) bool {
 type Object struct {
 	Meta  Meta
 	Key   Key
-	Value interface{}
+	Value string
 }
