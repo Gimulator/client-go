@@ -127,7 +127,7 @@ func (c *Client) Find(key Key) ([]Object, error) {
 	return objectList, nil
 }
 
-func (c *Client) Set(key Key, val stringt ) error {
+func (c *Client) Set(key Key, val string) error {
 	obj := Object{Key: key, Value: val}
 	url := c.url(urlPathSet)
 
