@@ -379,10 +379,18 @@ type Meta struct {
 	Method       Method
 }
 
+func (m Meta) String() string {
+	return fmt.Sprintf("{Owner: %s, Method: %s, Creation-Time: %v}", m.Owner, m.Method, m.CreationTime)
+}
+
 type Key struct {
 	Type      string
 	Namespace string
 	Name      string
+}
+
+func (k Key) String() string {
+	return fmt.Sprintf("{Type: %s, Namespace: %s, Name: %s}", k.Type, k.Namespace, k.Name)
 }
 
 func (k Key) Equal(key Key) bool {
@@ -421,5 +429,5 @@ func (o Object) String() string {
 		val = fmt.Sprintf("'%s'", o.Value)
 	}
 
-	return fmt.Sprintf("{Key: %v, Value: %s}", o.Key, val)
+	return fmt.Sprintf("{Key: %v, Value: %s, Meta: }", o.Key, val)
 }
